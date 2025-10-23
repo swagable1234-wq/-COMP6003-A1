@@ -495,7 +495,6 @@ public class LeftSidebar extends JPanel {
             filterSmoothMedium.setVisible(true);
             filterSmoothHard.setVisible(true);
             filterInvert.setVisible(true);
-
             redRebalance.setVisible(false);
             greenRebalance.setVisible(false);
             blueRebalance.setVisible(false);
@@ -507,7 +506,6 @@ public class LeftSidebar extends JPanel {
             btnLightnessOntoHue.setVisible(false);
             saveImage.setVisible(false);
             loadImage.setVisible(false);
-
             redRebalance.setVisible(true);
             greenRebalance.setVisible(true);
             blueRebalance.setVisible(true);

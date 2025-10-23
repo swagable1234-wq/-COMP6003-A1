@@ -88,6 +88,9 @@ public class ImageScreen extends JPanel {
     }
 
     public static void redraw() {
+        ImageScreen.currentImageHeight = ImageScreen.currentImage.getHeight();
+        ImageScreen.currentImageWidth = ImageScreen.currentImage.getWidth();
+
         paintImage(ImageScreen.currentImage);
     }
 

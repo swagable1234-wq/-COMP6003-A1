@@ -34,7 +34,13 @@ public class ImageScreen extends JPanel {
 
     public static BitMapImage currentImage;
     public static GeneticAlgorithm currentGA;
-    public static boolean halt;
+
+
+    //remote session id
+    public static String currentSessionId;
+    public static volatile boolean halt = false;
+
+
 
     // Singleton pattern
     private static final ImageScreen instance = new ImageScreen();

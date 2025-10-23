@@ -1,9 +1,11 @@
 package com.application.panels;
 
+import com.API.GAConnector;
 import com.GA.GeneticAlgorithm;
 import com.GA.crossover.*;
 import com.GA.fitness.*;
 import com.GA.fitness.adjustment.FitnessAdjustment;
+import com.GA.fitness.adjustment.NoAdjustment;
 import com.GA.fitness.adjustment.NormalisationAdjustment;
 import com.GA.generation.GenerationFunction;
 import com.GA.generation.RandomBitmapGeneration;
@@ -13,6 +15,7 @@ import com.GA.selection.RouletteWheelSelection;
 import com.GA.selection.SelectionFunction;
 import com.GA.selection.TournamentSelection;
 import com.application.Application;
+import com.application.GABuilder;
 import com.utils.BitMapImage;
 import com.utils.ImageRW;
 
@@ -22,6 +25,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 public class GAParametersPanel extends JPanel {
 
@@ -78,6 +83,13 @@ public class GAParametersPanel extends JPanel {
     // Singleton pattern
     private static final GAParametersPanel instance = new GAParametersPanel();
 
+    private JComboBox<String> cmbGenerationFunction;
+    private JComboBox<String> cmbFitnessFunction;
+    private JComboBox<String> cmbSelectionFunction;
+    private JComboBox<String> cmbCrossoverFunction;
+    private JComboBox<String> cmbMutationFunction;
+    private JTextField txtFitnessFunctionImagePath;
+
     public static GAParametersPanel getInstance() {
         return instance;
     }
@@ -97,11 +109,11 @@ public class GAParametersPanel extends JPanel {
         JTextField txtPopulationSize = new JTextField("1000");
         JTextField txtElite = new JTextField("30");
         JTextField txtReGeneration = new JTextField("50");
-        JComboBox<String> cmbGenerationFunction = new JComboBox<String>(GENERATION_FUNCTIONS);
-        JComboBox<String> cmbFitnessFunction = new JComboBox<String>(FITNESS_FUNCTIONS);
-        JComboBox<String> cmbSelectionFunction = new JComboBox<String>(SELECTION_FUNCTIONS);
-        JComboBox<String> cmbCrossoverFunction = new JComboBox<String>(CROSSOVER_FUNCTIONS);
-        JComboBox<String> cmbMutationFunction = new JComboBox<String>(MUTATION_FUNCTIONS);
+        cmbGenerationFunction = new JComboBox<>(GENERATION_FUNCTIONS);
+        cmbFitnessFunction = new JComboBox<>(FITNESS_FUNCTIONS);
+        cmbSelectionFunction = new JComboBox<>(SELECTION_FUNCTIONS);
+        cmbCrossoverFunction = new JComboBox<>(CROSSOVER_FUNCTIONS);
+        cmbMutationFunction = new JComboBox<>(MUTATION_FUNCTIONS);
 
         // Panel for selecting image path for fitness functions that take an image as a parameter
         JPanel pnlFitnessFunctionImagePath = new JPanel();
@@ -170,10 +182,102 @@ public class GAParametersPanel extends JPanel {
         JButton btnBeginGA = new JButton("Begin GA");
         btnBeginGA.addActionListener(new ActionListener() {
             @Override
-            public void actionPerformed(ActionEvent e) {
+            public void actionPerformed(ActionEvent e) { // modified to handle both local and remote GA initialisation
                 int populationSize = Integer.parseInt(txtPopulationSize.getText());
                 int elite = Integer.parseInt(txtElite.getText());
                 int regeneration = Integer.parseInt(txtReGeneration.getText());
+
+
+                if (RightSidebar.getInstance().isRemote()) {
+                    try {
+                        Map<String, Object> params = new HashMap<>();
+                        params.put("populationSize", populationSize);
+                        params.put("eliteCount", elite);
+                        params.put("regeneration", regeneration);
+                        params.put("imageHeight", ImageScreen.currentImageHeight);
+                        params.put("imageWidth", ImageScreen.currentImageWidth);
+
+                        Map<String, Object> genParams = new HashMap<>();
+                        genParams.put("name", cmbGenerationFunction.getSelectedItem());
+                        params.put("generationFunction", genParams);
+
+                        Map<String, Object> fitParams = new HashMap<>();
+                        fitParams.put("name", cmbFitnessFunction.getSelectedItem());
+                        String[] fitnessFuncParams = txtFitnessFunctionImagePath.getText().split(",");
+                        if (fitnessFuncParams.length > 0 && !fitnessFuncParams[0].isEmpty()) {
+                            fitParams.put("params", fitnessFuncParams);
+                        }
+                        params.put("fitnessFunction", fitParams);
+
+                        Map<String, Object> selParams = new HashMap<>();
+                        selParams.put("name", cmbSelectionFunction.getSelectedItem());
+                        params.put("selectionFunction", selParams);
+
+                        Map<String, Object> crossParams = new HashMap<>();
+                        crossParams.put("name", cmbCrossoverFunction.getSelectedItem());
+                        params.put("crossoverFunction", crossParams);
+
+                        Map<String, Object> mutParams = new HashMap<>();
+                        mutParams.put("name", cmbMutationFunction.getSelectedItem());
+                        params.put("mutationFunction", mutParams);
+
+                        ImageScreen.currentSessionId = GAConnector.init(params);
+                        ImageScreen.currentGA = null; // Ensure no local GA is used
+                        RightSidebar.layout.show(RightSidebar.getInstance(), "GA Generations");
+                        GAGenerationsPanel.status = "Initialised";
+                        GAGenerationsPanel.updateStatusString();
+                    } catch (IOException | InterruptedException ex) {
+                        ex.printStackTrace();
+                        JOptionPane.showMessageDialog(GAParametersPanel.this,
+                                "Failed to start remote GA session: " + ex.getMessage(),
+                                "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                } else {
+                    // This is the existing local GA creation logic
+                    GABuilder builder = new GABuilder();
+                    builder.setImageHeight(ImageScreen.currentImageHeight);
+                    builder.setImageWidth(ImageScreen.currentImageWidth);
+                    builder.setPopulationSize(populationSize);
+                    builder.setElite(elite);
+                    builder.setRegeneration(regeneration);
+
+                    String generationFunctionName = (String) cmbGenerationFunction.getSelectedItem();
+                    GenerationFunction generationFunction = createGenerationFunction(generationFunctionName, null);
+                    builder.setGenerationFunction(generationFunction);
+
+                    String fitnessFunctionName = (String) cmbFitnessFunction.getSelectedItem();
+                    String[] fitnessFunctionParams = txtFitnessFunctionImagePath.getText().split(",");
+                    FitnessFunction fitnessFunction = createFitnessFunction(fitnessFunctionName, fitnessFunctionParams);
+                    builder.setFitnessFunction(fitnessFunction);
+
+                    String selectionFunctionName = (String) cmbSelectionFunction.getSelectedItem();
+                    SelectionFunction selectionFunction = createSelectionFunction(selectionFunctionName, null);
+                    builder.setSelectionFunction(selectionFunction);
+
+                    Object[] crossoverRefs = new Object[]{fitnessFunction};
+                    String crossoverFunctionName = (String) cmbCrossoverFunction.getSelectedItem();
+                    CrossoverFunction crossoverFunction = createCrossoverFunction(crossoverFunctionName, null, crossoverRefs);
+                    builder.setCrossoverFunction(crossoverFunction);
+
+                    Object[] mutationRefs = new Object[]{fitnessFunction};
+                    String mutationFunctionName = (String) cmbMutationFunction.getSelectedItem();
+                    MutationFunction mutationFunction = createMutationFunction(mutationFunctionName, null, mutationRefs);
+                    builder.setMutationFunction(mutationFunction);
+
+                    FitnessAdjustment fitnessAdjustment = new NoAdjustment();
+                    builder.setFitnessAdjustment(fitnessAdjustment);
+
+                    ImageScreen.currentGA = builder.build();
+                    ImageScreen.currentSessionId = null; // Ensure no session ID is used
+                    RightSidebar.layout.show(RightSidebar.getInstance(), "GA Generations");
+                    GAGenerationsPanel.status = "Initialised";
+                    GAGenerationsPanel.updateStatusString();
+                }
+
+
+
+
+
                 String generationFunctionOption = cmbGenerationFunction.getSelectedItem().toString();
                 String fitnessFunctionOption = cmbFitnessFunction.getSelectedItem().toString();
                 String selectionFunctionOption = cmbSelectionFunction.getSelectedItem().toString();

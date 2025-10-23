@@ -8,9 +8,11 @@ import java.awt.event.ActionListener;
 public class ModeScreen extends JPanel {
 
     // Singleton pattern
-    private static final ModeScreen instance = new ModeScreen();
+    private static ModeScreen instance = new ModeScreen();
 
     public static ModeScreen getInstance() {
+        if(instance == null)
+            instance = new ModeScreen();
         return instance;
     }
 
@@ -28,6 +30,8 @@ public class ModeScreen extends JPanel {
         btnRemote.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
+                LeftSidebar.getInstance().setRemote(true);
+                RightSidebar.getInstance().setRemote(true);
                 ApplicationWindow.layout.show(ApplicationWindow.cards, "Connection");
             }
         });

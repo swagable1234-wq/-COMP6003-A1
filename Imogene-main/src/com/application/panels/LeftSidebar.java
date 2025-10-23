@@ -110,12 +110,6 @@ public class LeftSidebar extends JPanel {
         });
 
 
-        /**
-         * Changes to smoothing filters:
-         * - need to make sure they call the modified filterConnector
-         * - and also have a local logic
-         */
-
         filterSmoothSoft = new JButton("Smooth (soft)");
         filterSmoothSoft.addActionListener(new ActionListener() {
             @Override

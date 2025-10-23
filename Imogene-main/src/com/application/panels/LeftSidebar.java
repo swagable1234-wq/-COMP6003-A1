@@ -501,10 +501,7 @@ public class LeftSidebar extends JPanel {
             filterSmoothMedium.setVisible(true);
             filterSmoothHard.setVisible(true);
             filterInvert.setVisible(true);
-<<<<<<< Updated upstream
-=======
-<<<<<<< HEAD
-<<<<<<< HEAD
+
             redRebalance.setVisible(false);
             greenRebalance.setVisible(false);
             blueRebalance.setVisible(false);
@@ -516,10 +513,7 @@ public class LeftSidebar extends JPanel {
             btnLightnessOntoHue.setVisible(false);
             saveImage.setVisible(false);
             loadImage.setVisible(false);
-=======
-=======
->>>>>>> b03281266c202c287b205d0764644e5dff943497
->>>>>>> Stashed changes
+
             redRebalance.setVisible(true);
             greenRebalance.setVisible(true);
             blueRebalance.setVisible(true);
@@ -529,13 +523,6 @@ public class LeftSidebar extends JPanel {
             btnHueOntoSaturation.setVisible(true);
             btnSaturationOntoLightness.setVisible(true);
             btnLightnessOntoHue.setVisible(true);
-<<<<<<< Updated upstream
-=======
-<<<<<<< HEAD
->>>>>>> b03281266c202c287b205d0764644e5dff943497
-=======
->>>>>>> b03281266c202c287b205d0764644e5dff943497
->>>>>>> Stashed changes
             this.remote = true;
         } else {
             generateRandom.setVisible(true);

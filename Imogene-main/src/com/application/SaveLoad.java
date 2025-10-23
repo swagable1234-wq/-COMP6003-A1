@@ -9,16 +9,9 @@ import java.awt.image.RenderedImage;
 import java.io.File;
 import java.io.IOException;
 
-/**
- * Handles saving and loading images for the Imogene application.
- */
 public class SaveLoad {
 
-    /**
-     * Opens a file chooser and allows the user to save the given image.
-     * @param image the BufferedImage to save
-     * @return true if the image was saved successfully, false otherwise
-     */
+
     public static boolean saveImage(BitMapImage image) {
         if (image == null) {
             JOptionPane.showMessageDialog(null, "No image to save!", "Error", JOptionPane.ERROR_MESSAGE);
@@ -52,10 +45,7 @@ public class SaveLoad {
         return false;
     }
 
-    /**
-     * Opens a file chooser and allows the user to load an image.
-     * @return the loaded BufferedImage, or null if cancelled or failed
-     */
+
     public static BitMapImage loadImage() {
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setDialogTitle("Open Image");

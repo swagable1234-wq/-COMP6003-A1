@@ -509,7 +509,6 @@ public class LeftSidebar extends JPanel {
 
             saveImage.setVisible(false);
             loadImage.setVisible(false);
-
             redRebalance.setVisible(true);
             greenRebalance.setVisible(true);
             blueRebalance.setVisible(true);

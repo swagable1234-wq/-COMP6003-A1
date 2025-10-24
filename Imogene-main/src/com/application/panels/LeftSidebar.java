@@ -411,7 +411,8 @@ public class LeftSidebar extends JPanel {
         // Separator
         add(Box.createVerticalStrut(10));
         add(new JSeparator(SwingConstants.HORIZONTAL));
-
+        add(saveImage);
+        add(loadImage);
         // Filter section
         add(lblFilters);
         add(filterGrayscale);
@@ -419,8 +420,6 @@ public class LeftSidebar extends JPanel {
         add(filterSmoothMedium);
         add(filterSmoothHard);
         add(filterInvert);
-        add(saveImage);
-        add(loadImage);
         //leftPanel.add(spectrumMaping);
         add(redRebalance);
         add(greenRebalance);
@@ -506,9 +505,6 @@ public class LeftSidebar extends JPanel {
             btnLightnessOntoHue.setVisible(false);
             saveImage.setVisible(true);
             loadImage.setVisible(true);
-
-            saveImage.setVisible(false);
-            loadImage.setVisible(false);
             redRebalance.setVisible(true);
             greenRebalance.setVisible(true);
             blueRebalance.setVisible(true);

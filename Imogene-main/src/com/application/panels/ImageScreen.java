@@ -38,6 +38,7 @@ public class ImageScreen extends JPanel {
 
     // Singleton pattern
     private static final ImageScreen instance = new ImageScreen();
+    public static String currentSessionId;
 
     public static ImageScreen getInstance() {
         return instance;

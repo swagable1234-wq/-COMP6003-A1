@@ -1,16 +1,13 @@
 package com.application;
 
 import com.utils.BitMapImage;
+import com.utils.ImageRW;
 
-import javax.imageio.ImageIO;
 import javax.swing.*;
-import java.awt.image.BufferedImage;
-import java.awt.image.RenderedImage;
 import java.io.File;
 import java.io.IOException;
 
 public class SaveLoad {
-
 
     public static boolean saveImage(BitMapImage image) {
         if (image == null) {
@@ -26,7 +23,7 @@ public class SaveLoad {
         if (userSelection == JFileChooser.APPROVE_OPTION) {
             File fileToSave = fileChooser.getSelectedFile();
 
-            // Default to .png if no extension is given
+
             String fileName = fileToSave.getAbsolutePath();
             if (!fileName.contains(".")) {
                 fileName += ".png";
@@ -35,7 +32,9 @@ public class SaveLoad {
 
             try {
                 String format = fileName.substring(fileName.lastIndexOf(".") + 1).toLowerCase();
-                ImageIO.write((RenderedImage) image, format, fileToSave);
+
+                ImageRW.writeImage(image, format, fileToSave.getAbsolutePath());
+
                 JOptionPane.showMessageDialog(null, "Image saved successfully!");
                 return true;
             } catch (IOException e) {
@@ -54,13 +53,9 @@ public class SaveLoad {
         if (userSelection == JFileChooser.APPROVE_OPTION) {
             File fileToOpen = fileChooser.getSelectedFile();
             try {
-                BufferedImage image = ImageIO.read(fileToOpen);
-                if (image == null) {
-                    JOptionPane.showMessageDialog(null, "Invalid image file.", "Error", JOptionPane.ERROR_MESSAGE);
-                    return null;
-                }
-                BitMapImage finalIMG = new BitMapImage(image.getWidth(), image.getHeight());
-                return finalIMG;
+                BitMapImage image = ImageRW.readImage(fileToOpen.getAbsolutePath());
+                JOptionPane.showMessageDialog(null, "Image loaded successfully!");
+                return image;
             } catch (IOException e) {
                 JOptionPane.showMessageDialog(null, "Error loading image: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
             }

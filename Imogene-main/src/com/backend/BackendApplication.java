@@ -18,8 +18,13 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class BackendApplication {
+
+    private static final Map<String, BitMapImage> gaSessions = new ConcurrentHashMap<>();
+    private static final Map<String, Map<String, Object>> gaStatuses = new ConcurrentHashMap<>();
 
     public static void main(String[] args) throws IOException {
         int portNumber = 8080;
@@ -29,6 +34,8 @@ public class BackendApplication {
         server.createContext("/", new RootHandler());
         server.createContext("/generate", new GenerationHandler());
         server.createContext("/filter", new FilterHandler());
+        server.createContext("/ga/init", new GAInitHandler());
+        server.createContext("/ga/", new GAHandler());
 
         server.setExecutor(null);
         server.start();
@@ -60,6 +67,180 @@ public class BackendApplication {
         return rawParams;
     }
 
+
+
+
+    static class GAInitHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            try {
+                if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                    exchange.sendResponseHeaders(405, -1); // Method not allowed
+                    return;
+                }
+
+                // Read request body (unused for now)
+                InputStream is = exchange.getRequestBody();
+                String body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+
+                // Generate a session id and store a minimal session image
+                String sessionId = UUID.randomUUID().toString();
+
+                // Create a small initial image so GET /ga/{id}/best returns JSON immediately
+                BitMapImage initial = ImageGenerator.randomPixels(16, 16);
+                gaSessions.put(sessionId, initial);
+
+                // Return plain text session id
+                byte[] respBytes = sessionId.getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().set("Content-Type", "text/plain; charset=utf-8");
+                exchange.sendResponseHeaders(200, respBytes.length);
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(respBytes);
+                }
+
+                System.out.println("Created GA session: " + sessionId + " (body: " + body + ")");
+            } catch (Exception e) {
+                exchange.sendResponseHeaders(500, -1);
+                e.printStackTrace();
+            }
+        }
+    }
+
+    static class GAHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            try {
+                String method = exchange.getRequestMethod();
+                String path = exchange.getRequestURI().getPath(); // e.g. /ga/{id}/best
+                String prefix = "/ga/";
+                if (!path.startsWith(prefix)) {
+                    sendPlain(exchange, 404, "");
+                    return;
+                }
+
+                // Extract parts after /ga/
+                String remainder = path.substring(prefix.length()); // {id}/best or init etc.
+                String[] parts = remainder.split("/");
+
+                // Endpoint: POST /ga/init  -> create new session (optional)
+                if ("POST".equalsIgnoreCase(method) && remainder.equals("init")) {
+                    String sessionId = UUID.randomUUID().toString();
+                    // Create an initial random image for the session (small example)
+                    BitMapImage img = ImageGenerator.randomPixels(100, 100);
+                    gaSessions.put(sessionId, img);
+                    gaStatuses.put(sessionId, new ConcurrentHashMap<>()); // empty status
+                    Map<String, Object> statusMap = gaStatuses.get(sessionId);
+                    statusMap.put("running", false);
+                    statusMap.put("generation", 0);
+
+                    String json = "{\"sessionId\":\"" + sessionId + "\"}";
+                    sendJson(exchange, 200, json);
+                    return;
+                }
+
+                // Expect at least an id segment
+                if (parts.length < 1 || parts[0].isEmpty()) {
+                    sendPlain(exchange, 404, "");
+                    return;
+                }
+
+                String sessionId = parts[0];
+
+                // POST /ga/{id}/run  -> start GA run (accepts optional body, ignored here)
+                if ("POST".equalsIgnoreCase(method) && remainder.endsWith("/run")) {
+                    if (!gaSessions.containsKey(sessionId)) {
+                        sendPlain(exchange, 404, "");
+                        return;
+                    }
+                    Map<String, Object> statusMap = gaStatuses.computeIfAbsent(sessionId, k -> new ConcurrentHashMap<>());
+                    statusMap.put("running", true);
+                    statusMap.put("generation", 0);
+
+                    // Optionally parse body for generations and start background task.
+                    // For now, just acknowledge.
+                    sendPlain(exchange, 200, "");
+                    return;
+                }
+
+                // POST /ga/{id}/halt -> stop GA run
+                if ("POST".equalsIgnoreCase(method) && remainder.endsWith("/halt")) {
+                    if (!gaSessions.containsKey(sessionId)) {
+                        sendPlain(exchange, 404, "");
+                        return;
+                    }
+                    Map<String, Object> statusMap = gaStatuses.computeIfAbsent(sessionId, k -> new ConcurrentHashMap<>());
+                    statusMap.put("running", false);
+                    sendPlain(exchange, 200, "");
+                    return;
+                }
+
+                // POST /ga/{id}/reset -> remove session
+                if ("POST".equalsIgnoreCase(method) && remainder.endsWith("/reset")) {
+                    gaSessions.remove(sessionId);
+                    gaStatuses.remove(sessionId);
+                    sendPlain(exchange, 200, "");
+                    return;
+                }
+
+                // GET /ga/{id}/status -> return JSON { running: bool, generation: int }
+                if ("GET".equalsIgnoreCase(method) && remainder.endsWith("/status")) {
+                    if (!gaSessions.containsKey(sessionId)) {
+                        sendPlain(exchange, 404, "");
+                        return;
+                    }
+                    Map<String, Object> statusMap = gaStatuses.computeIfAbsent(sessionId, k -> {
+                        Map<String, Object> m = new ConcurrentHashMap<>();
+                        m.put("running", false);
+                        m.put("generation", 0);
+                        return m;
+                    });
+                    // Build JSON
+                    boolean running = Boolean.TRUE.equals(statusMap.getOrDefault("running", false));
+                    int generation = ((Number) statusMap.getOrDefault("generation", 0)).intValue();
+                    String json = "{\"running\":" + running + ",\"generation\":" + generation + "}";
+                    sendJson(exchange, 200, json);
+                    return;
+                }
+
+                // GET /ga/{id}/best -> return stored image JSON
+                if ("GET".equalsIgnoreCase(method) && remainder.endsWith("/best")) {
+                    BitMapImage img = gaSessions.get(sessionId);
+                    if (img == null) {
+                        sendPlain(exchange, 404, "");
+                        return;
+                    }
+                    String json = Util.arrayToJson(img.getRgb());
+                    sendJson(exchange, 200, json);
+                    return;
+                }
+
+                // Unknown GA sub-endpoint
+                sendPlain(exchange, 404, "");
+            } catch (Exception e) {
+                e.printStackTrace();
+                sendPlain(exchange, 500, "Internal error");
+            }
+        }
+    }
+
+
+    private static void sendJson(HttpExchange exchange, int status, String body) throws IOException {
+        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+        byte[] bytes = body == null ? new byte[0] : body.getBytes(StandardCharsets.UTF_8);
+        exchange.sendResponseHeaders(status, bytes.length);
+        try (OutputStream os = exchange.getResponseBody()) {
+            os.write(bytes);
+        }
+    }
+
+    private static void sendPlain(HttpExchange exchange, int status, String body) throws IOException {
+        exchange.getResponseHeaders().set("Content-Type", "text/plain; charset=utf-8");
+        byte[] bytes = body == null ? new byte[0] : body.getBytes(StandardCharsets.UTF_8);
+        exchange.sendResponseHeaders(status, bytes.length);
+        try (OutputStream os = exchange.getResponseBody()) {
+            os.write(bytes);
+        }
+    }
     static class RootHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {

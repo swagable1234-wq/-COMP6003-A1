@@ -1,5 +1,6 @@
 package com.application.panels;
 
+import com.API.GAConnector;
 import com.application.Application;
 import com.utils.BitMapImage;
 import com.utils.ImageUtils;
@@ -8,6 +9,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.IOException;
+import java.util.Map;
 import java.util.function.Function;
 
 public class GAGenerationsPanel extends JPanel {
@@ -33,68 +36,62 @@ public class GAGenerationsPanel extends JPanel {
         JButton btnReset = new JButton("Reset");
         JButton btnApplySmoothing = new JButton("Apply Smoothing");
         JButton btnSaveAsGif = new JButton("Save as GIF");
-        btnRun.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                int generations;
-                try {
-                    generations = Integer.parseInt(txtGenerations.getText());
-                }
-                catch (NumberFormatException ex) {
-                    System.out.println("Can't interpret \"" + txtGenerations.getText() + "\" as an integer");
-                    return;
-                }
-                ImageScreen.halt = false;
-                btnRun.setEnabled(false);
-                btnHalt.setEnabled(true);
-                btnReset.setEnabled(false);
-                btnApplySmoothing.setEnabled(false);
-                generationsRunning = generations;
-                new Thread(() -> {
-                    status = "Running";
-                    updateStatusString();
-                    for(int i = 0; i < generations; i++) {
-                        if(ImageScreen.halt) break;
-                        currentGenerationNumber = i + 1;
-                        updateStatusString();
-                        ImageScreen.currentGA.gaStep();
-                        if(ImageScreen.halt) break;
-                        //System.out.println("Step");
-                        SwingUtilities.invokeLater(() -> {
-                            ImageScreen.currentImage = ImageScreen.currentGA.best.getLast().getImage();
-                            ImageScreen.redraw();
-                        });
-                        //System.out.println("Thread painted");
-                    }
-                    btnRun.setEnabled(true);
-                    btnHalt.setEnabled(false);
-                    btnReset.setEnabled(true);
-                    btnApplySmoothing.setEnabled(true);
-                    status = "Finished";
-                    updateStatusString();
-                    //ga.finished = true; // TODO: no longer needed
-                }).start();
+        btnRun.addActionListener(e -> {
+            int generations;
+            try {
+                generations = Integer.parseInt(txtGenerations.getText());
+            } catch (NumberFormatException ex) {
+                System.out.println("Can't interpret \"" + txtGenerations.getText() + "\" as an integer");
+                return;
+            }
+            ImageScreen.halt = false;
+            btnRun.setEnabled(false);
+            btnHalt.setEnabled(true);
+            btnReset.setEnabled(false);
+            btnApplySmoothing.setEnabled(false);
+            generationsRunning = generations;
+
+            if (RightSidebar.getInstance().isRemote()) {
+                runRemote(generations, btnRun, btnHalt, btnReset, btnApplySmoothing);
+            } else {
+                runLocal(generations, btnRun, btnHalt, btnReset, btnApplySmoothing);
             }
         });
 
-        btnHalt.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                status = "Stopping...";
-                updateStatusString();
-                ImageScreen.halt = true;
-                btnHalt.setEnabled(false);
-                btnReset.setEnabled(false);
-                btnApplySmoothing.setEnabled(false);
+        btnHalt.addActionListener(e -> {
+            status = "Stopping...";
+            updateStatusString();
+            ImageScreen.halt = true;
+            btnHalt.setEnabled(false);
+            btnReset.setEnabled(false);
+            btnApplySmoothing.setEnabled(false);
+
+            if (RightSidebar.getInstance().isRemote() && ImageScreen.currentSessionId != null) {
+                new Thread(() -> {
+                    try {
+                        GAConnector.halt(ImageScreen.currentSessionId);
+                    } catch (IOException | InterruptedException ex) {
+                        ex.printStackTrace();
+                    }
+                }).start();
             }
         });
         btnHalt.setEnabled(false);
 
-        btnReset.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                RightSidebar.layout.show(RightSidebar.getInstance(), "GA Params");
+        // Mmodify the btnReset action listener
+        btnReset.addActionListener(e -> {
+            if (RightSidebar.getInstance().isRemote() && ImageScreen.currentSessionId != null) {
+                new Thread(() -> {
+                    try {
+                        GAConnector.reset(ImageScreen.currentSessionId);
+                        ImageScreen.currentSessionId = null;
+                    } catch (IOException | InterruptedException ex) {
+                        ex.printStackTrace();
+                    }
+                }).start();
             }
+            ImageScreen.currentGA = null;
+            RightSidebar.layout.show(RightSidebar.getInstance(), "GA Params");
         });
 
         btnApplySmoothing.addActionListener(new ActionListener() {
@@ -161,6 +158,76 @@ public class GAGenerationsPanel extends JPanel {
         else
             statusString = status;
         statusLabel.setText(statusString);
+    }
+
+    //running ga locally for local mode
+
+    private void runLocal(int generations, JButton btnRun, JButton btnHalt, JButton btnReset, JButton btnApplySmoothing) {
+        new Thread(() -> {
+            status = "Running";
+            updateStatusString();
+            for (int i = 0; i < generations; i++) {
+                if (ImageScreen.halt) break;
+                currentGenerationNumber = i + 1;
+                updateStatusString();
+                ImageScreen.currentGA.gaStep();
+                if (ImageScreen.halt) break;
+                SwingUtilities.invokeLater(() -> {
+                    ImageScreen.currentImage = ImageScreen.currentGA.best.getLast().getImage();
+                    ImageScreen.redraw();
+                });
+            }
+            btnRun.setEnabled(true);
+            btnHalt.setEnabled(false);
+            btnReset.setEnabled(true);
+            btnApplySmoothing.setEnabled(true);
+            status = "Finished";
+            updateStatusString();
+        }).start();
+    }
+
+    //running ga remotely for remote mode
+    private void runRemote(int generations, JButton btnRun, JButton btnHalt, JButton btnReset, JButton btnApplySmoothing) {
+        new Thread(() -> {
+            try {
+                GAConnector.run(ImageScreen.currentSessionId, generations);
+                status = "Running";
+                boolean isRunning = true;
+                while (isRunning && !ImageScreen.halt) {
+                    try {
+                        Thread.sleep(1000); // Poll every second
+                        Map<String, Object> statusMap = GAConnector.getStatus(ImageScreen.currentSessionId);
+                        isRunning = (Boolean) statusMap.getOrDefault("running", false);
+                        currentGenerationNumber = ((Number) statusMap.getOrDefault("generation", 0)).intValue();
+                        updateStatusString();
+
+                        BitMapImage bestImage = GAConnector.getBestImage(ImageScreen.currentSessionId);
+                        SwingUtilities.invokeLater(() -> {
+                            ImageScreen.currentImage = bestImage;
+                            ImageScreen.redraw();
+                        });
+                    } catch (IOException | InterruptedException ex) {
+                        ex.printStackTrace();
+                        status = "Error";
+                        isRunning = false;
+                    }
+                }
+            } catch (IOException | InterruptedException ex) {
+                ex.printStackTrace();
+                status = "Error";
+            } finally {
+                SwingUtilities.invokeLater(() -> {
+                    btnRun.setEnabled(true);
+                    btnHalt.setEnabled(false);
+                    btnReset.setEnabled(true);
+                    btnApplySmoothing.setEnabled(true); //smoothing local only
+                    if (!status.equals("Error")) {
+                        status = "Finished";
+                    }
+                    updateStatusString();
+                });
+            }
+        }).start();
     }
 
 }

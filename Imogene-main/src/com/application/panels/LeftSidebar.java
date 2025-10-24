@@ -4,12 +4,15 @@ import com.API.FilterConnector;
 import com.API.GenerationConnector;
 import com.GA.ImageGenerator;
 import com.GA.generation.RandomColorGeneration;
+import com.application.SaveLoad;
+import com.utils.BitMapImage;
 import com.utils.ImageUtils;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.image.BufferedImage;
 
 public class LeftSidebar extends JPanel {
 
@@ -21,6 +24,7 @@ public class LeftSidebar extends JPanel {
     }
 
     private boolean remote = false;
+    SaveLoad saveLoad = new SaveLoad();
 
     // Buttons moved out for visibility customisation
     private JButton generateRandom;
@@ -39,6 +43,8 @@ public class LeftSidebar extends JPanel {
     private JButton btnHueOntoSaturation;
     private JButton btnSaturationOntoLightness;
     private JButton btnLightnessOntoHue;
+    private JButton saveImage;
+    private JButton loadImage;
 
 
     public LeftSidebar() {
@@ -103,12 +109,6 @@ public class LeftSidebar extends JPanel {
             }
         });
 
-
-        /**
-         * Changes to smoothing filters:
-         * - need to make sure they call the modified filterConnector
-         * - and also have a local logic
-         */
 
         filterSmoothSoft = new JButton("Smooth (soft)");
         filterSmoothSoft.addActionListener(new ActionListener() {
@@ -185,6 +185,32 @@ public class LeftSidebar extends JPanel {
                     ImageScreen.currentImage = ImageUtils.invert(ImageScreen.currentImage);
                 }
                 ImageScreen.redraw();
+            }
+        });
+
+        saveImage = new JButton("Save Image");
+        saveImage.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (ImageScreen.currentImage == null) {
+                    JOptionPane.showMessageDialog(null, "No image to save!", "Error", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                saveLoad.saveImage(ImageScreen.currentImage);
+            }
+        });
+
+        loadImage = new JButton("Load Image");
+        loadImage.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                BitMapImage loaded = saveLoad.loadImage();
+                if (loaded != null) {
+                    ImageScreen.currentImage = loaded;
+                    ImageScreen.currentImageHeight = loaded.getHeight();
+                    ImageScreen.currentImageWidth = loaded.getWidth();
+                    ImageScreen.redraw();
+                }
             }
         });
 
@@ -393,6 +419,8 @@ public class LeftSidebar extends JPanel {
         add(filterSmoothMedium);
         add(filterSmoothHard);
         add(filterInvert);
+        add(saveImage);
+        add(loadImage);
         //leftPanel.add(spectrumMaping);
         add(redRebalance);
         add(greenRebalance);
@@ -421,6 +449,8 @@ public class LeftSidebar extends JPanel {
         filterSmoothMedium.setAlignmentX(Component.CENTER_ALIGNMENT);
         filterSmoothHard.setAlignmentX(Component.CENTER_ALIGNMENT);
         filterInvert.setAlignmentX(Component.CENTER_ALIGNMENT);
+        saveImage.setAlignmentX(Component.CENTER_ALIGNMENT);
+        loadImage.setAlignmentX(Component.CENTER_ALIGNMENT);
         //spectrumMaping.setAlignmentX(Component.CENTER_ALIGNMENT);
         redRebalance.setAlignmentX(Component.CENTER_ALIGNMENT);
         greenRebalance.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -441,6 +471,8 @@ public class LeftSidebar extends JPanel {
         filterSmoothMedium.setMaximumSize(new Dimension(Integer.MAX_VALUE, filterSmoothMedium.getPreferredSize().height));
         filterSmoothHard.setMaximumSize(new Dimension(Integer.MAX_VALUE, filterSmoothHard.getPreferredSize().height));
         filterInvert.setMaximumSize(new Dimension(Integer.MAX_VALUE, filterInvert.getPreferredSize().height));
+        saveImage.setMaximumSize(new Dimension(Integer.MAX_VALUE, saveImage.getPreferredSize().height));
+        loadImage.setMaximumSize(new Dimension(Integer.MAX_VALUE, loadImage.getPreferredSize().height));
         //spectrumMaping.setMaximumSize(new Dimension(Integer.MAX_VALUE, spectrumMaping.getPreferredSize().height));
         redRebalance.setMaximumSize(new Dimension(Integer.MAX_VALUE, redRebalance.getPreferredSize().height));
         greenRebalance.setMaximumSize(new Dimension(Integer.MAX_VALUE, greenRebalance.getPreferredSize().height));
@@ -463,6 +495,17 @@ public class LeftSidebar extends JPanel {
             filterSmoothMedium.setVisible(true);
             filterSmoothHard.setVisible(true);
             filterInvert.setVisible(true);
+            redRebalance.setVisible(false);
+            greenRebalance.setVisible(false);
+            blueRebalance.setVisible(false);
+            btnRedOntoGreen.setVisible(false);
+            btnGreenOntoBlue.setVisible(false);
+            btnBlueOntoRed.setVisible(false);
+            btnHueOntoSaturation.setVisible(false);
+            btnSaturationOntoLightness.setVisible(false);
+            btnLightnessOntoHue.setVisible(false);
+            saveImage.setVisible(false);
+            loadImage.setVisible(false);
             redRebalance.setVisible(true);
             greenRebalance.setVisible(true);
             blueRebalance.setVisible(true);
@@ -490,6 +533,8 @@ public class LeftSidebar extends JPanel {
             btnHueOntoSaturation.setVisible(true);
             btnSaturationOntoLightness.setVisible(true);
             btnLightnessOntoHue.setVisible(true);
+            saveImage.setVisible(true);
+            loadImage.setVisible(true);
             this.remote = false;
         }
     }
